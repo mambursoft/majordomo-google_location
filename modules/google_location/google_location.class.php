@@ -124,7 +124,7 @@ function log($message) {
 
 function admin(&$out) {
  $this->getConfig();
- $directory_cookies=ROOT."cms/cached/google_location/";
+ $directory_cookies=ROOT."cms/files/google_location/";
  if (!file_exists($directory_cookies)) {
     mkdir($directory_cookies, 0777, true);}
  if ($this->view_mode=='update_settings') {
@@ -293,6 +293,7 @@ function usual(&$out) {
  public function updateLocation() {
     $locations = [];
     $directory_cookies=ROOT."cms/cached/google_location/";
+	 if (!file_exists($directory_cookies)) $directory_cookies=ROOT."cms/files/google_location/"; //для рабочих (у кого уже есть куки в старой папке)
     $cookies = array_diff(scandir($directory_cookies), array('..', '.'));
     foreach ($cookies as $cookie)
     {
