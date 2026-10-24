@@ -1,183 +1,308 @@
 [#if VIEW_MODE=""#]
-<div>
- <a class="btn btn-default" href="#api_settings" data-toggle="collapse"><i class="glyphicon glyphicon-cog"></i> <#LANG_SETUP#></a>
- <button class="btn btn-primary btn-sm float-right" data-toggle="modal" data-target="#about"><#LANG_GL_ABOUT#>&nbsp;&nbsp;<span class="glyphicon glyphicon-info-sign icon-white"></span>
-	</button>
+<div class="row" style="margin-bottom: 15px;">
+    <div class="col-md-6">
+        <a class="btn btn-default" href="#api_settings" data-toggle="collapse"><i class="glyphicon glyphicon-cog"></i> <#LANG_SETUP#></a>
+        <a class="btn btn-primary" href="?view_mode=update_location"><i class="glyphicon glyphicon-refresh"></i> <#LANG_GL_MANUAL_UPDATE#></a>
     </div>
-<div class="collapse" id='api_settings'>&nbsp;
-&nbsp;
-<fieldset>
-<form name="cookies_form" method="POST" action="?" enctype="multipart/form-data" class="form-horizontal">
-  <div class="form-group">
-    <label class="col-lg-7 control-label"><#LANG_GL_COOKIES#></label>
-    <div class="col-lg-3"><input class="form-control" type="file" name="file" class="input"></div>
-    <a href='#' onclick='document.forms["cookies_form"].submit(); return false;' title="<#LANG_ADD#>" class="btn btn-default"><i class='glyphicon glyphicon-plus'></i></a>
-    <button class="btn btn-default" data-toggle="modal" data-target="#help"><i class="glyphicon glyphicon-question-sign"></i></button>
-  </div>
-  <input type="hidden" name="view_mode" value="upload_cookie">
-</form>
-<form action="?" method="post" enctype="multipart/form-data" name="frmEdit" class="form-horizontal">
-[#if COOKIES_FILES#]
-[#begin COOKIES_FILES#]
-<div class="form-group">
- <label class="col-lg-5 control-label"></label>
- <div class="col-lg-3">
-      <div class="col-lg-8">
-        <p class="form-control-static">
-        [#if ERROR!=''#]
-         <i class="glyphicon glyphicon-info-sign" style="color:red;" title='[#ERROR#]'></i>
-        [#endif ERROR#]
-        [#NAME#] ([#SIZE#])
-        </p>
-      </div>
- </div>
- <a class="btn btn-default" href="?view_mode=delete_cookie&name=[#NAME#]" title="<#LANG_DELETE#>" onClick="return confirm('<#LANG_ARE_YOU_SURE#>')"><i class="glyphicon glyphicon-remove"></i></a>
- </div>
-[#end COOKIES_FILES#]
-[#else COOKIES_FILES#]
-<div class="form-group">
- <label class="col-lg-5 control-label"></label>
- <div class="col-lg-3">
-    <div class="alert alert-danger"><#LANG_NO_RECORDS_FOUND#></div>
- </div>
+    <div class="col-md-6 text-right">
+        <button class="btn btn-info btn-sm" data-toggle="modal" data-target="#about"><#LANG_GL_ABOUT#>&nbsp;&nbsp;<span class="glyphicon glyphicon-info-sign"></span></button>
+        <button class="btn btn-default btn-sm" data-toggle="modal" data-target="#help"><#LANG_GL_COOKIE_HELP#>&nbsp;&nbsp;<span class="glyphicon glyphicon-question-sign"></span></button>
+    </div>
 </div>
-[#endif COOKIES_FILES#]
-<div class="form-group">
- <label class="col-lg-5 control-label"><#LANG_GL_SETTING_TIMEOUT#>
- </label>
- <div class="col-lg-1"><input class="form-control" type="number" min=0 max=60 step=1 name="timeout_update" value="<#TIMEOUT_UPDATE#>" class="input"></div>
-</div>
-<div class="form-group">
- <label class="col-lg-5 control-label"><#LANG_GL_LIMIT_SPEED_MIN#></label>
- <div class="col-lg-1"><input class="form-control input" type="number" min=0 max=10 step=0.1 name="min_limit_speed" value="<#MIN_LIMIT_SPEED#>"></div>
-</div>
-<div class="form-group">
- <label class="col-lg-5 control-label"><#LANG_GL_LIMIT_SPEED_MAX#></label>
- <div class="col-lg-1"><input class="form-control input" type="number" min=0 step=1 name="max_limit_speed" value="<#MAX_LIMIT_SPEED#>"></div>
-</div>
-<div class="form-group">
- <label class="col-lg-5 control-label"><#LANG_GL_DEBUG#></label>
- <div class="controls"><input type="checkbox" name="debug" value="1"[#if DEBUG="1"#] checked[#endif#]></div>
-</div>
-<div class="form-actions">
-<button type="submit" name="subm" value="Submit" class="btn btn-primary"><#LANG_SUBMIT#></button>
-<input type="hidden" name="view_mode" value="update_settings">
-<input type="hidden" name="mode" value="update">
-</div>
-</fieldset>
-</form>
-</div>
-<br>
-<a class="btn btn-default" href="?view_mode=update_location" ><i class="glyphicon glyphicon-refresh"></i>&nbsp;<#LANG_UPDATE#></a>
-&nbsp;<#LANG_LATEST_UPDATES#>: <#LAST_UPDATE#>
-<br><br>
-<table class="table table-condensed table-striped">
-<thead class="thead-light">
- <tr>
-  <td>&nbsp;</td>
-  <td><b><#LANG_NAME#></b></td>
-  <td><b><#LANG_LOCATION#></b></td>
-  <td><b><#LANG_ACCURACY#></b></td>
-  <td><b><#LANG_SPEED#></b></td>
-  <td><b><#LANG_LATEST_UPDATES#></b></td>
-  <td><b><#LANG_BATTERY_LEVEL#></b></td>
-  <td><b><#LANG_GL_SENDTOGPS#></b></td>
-  <td>&nbsp;</td>
- </tr>
-</thead>
-<tbody>
- [#begin LOCATIONS#]
- <tr [#if WARNING=="1"#]class="danger"[#endif WARNING#]>
-  <td><img src="[#IMAGE#]" style="border-radius: 0 50% 50%;" title="[#ID_USER#]" height="30px" onerror="this.src='/templates/google_location/none.jpg'"></td>
-  <td title="[#FULLNAME#]">[#NAME#]</td>
-  <td><a onclick="var url=('https://static-maps.yandex.ru/1.x/?ll=[#LON#],[#LAT#]&size=650,450&z=17&l=map&pt=[#LON#],[#LAT#],pm2blm');
-                        $.fancybox.open({'type': 'image',src: url});return false;">
-                        <i class="glyphicon glyphicon-map-marker"></i> [#ADDRESS#]
-                    </a></td>
-  <td>[#ACCURACY#]</td>
-  <td>[#SPEED#]</td>
-  <td>[#LASTUPDATE#]</td>
-  <td>[#if CHARGING=="1"#]<i class="glyphicon glyphicon-flash"> </i>[#endif CHARGING#][#BATTLEVEL#]%</td>
-  <td>[#if SENDTOGPS=="1"#]
-        <a class="btn btn-success" href="?view_mode=send_switch&id=[#ID_USER#]" ><#LANG_ON#></a>
-    [#else#]
-        <a class="btn btn-danger" href="?view_mode=send_switch&id=[#ID_USER#]" ><#LANG_OFF#></a>
-    [#endif SENDTOGPS#]
-  </td>
-  <td width="1%" nowrap>
-  [#if "<#ACTION#>"=="admin"#]
-    <a href="?view_mode=user_edit&id=[#ID#]" class="btn btn-default btn-sm" title="<#LANG_EDIT#>"><i class="glyphicon glyphicon-pencil"></i></a>
-    <a href="?view_mode=user_delete&id=[#ID#]" onClick="return confirm('<#LANG_ARE_YOU_SURE#>')" class="btn btn-default btn-sm" title="<#LANG_DELETE#>"><i class="glyphicon glyphicon-remove"></i></a>
-  [#endif ACTION#]
- </td>
 
- </tr>
- [#end LOCATIONS#]
- </tbody>
-</table>   
- 
+<!-- Settings Panel -->
+<div class="collapse" id="api_settings">
+    <div class="well">
+        <fieldset>
+            <legend><#LANG_GL_COOKIES#></legend>
+            <form name="cookies_form" method="POST" action="?" enctype="multipart/form-data" class="form-inline" style="margin-bottom: 15px;">
+                <div class="form-group">
+                    <label><#LANG_GL_SELECT_COOKIE_FILE#>: &nbsp;</label>
+                    <input type="file" name="file" class="form-control input-sm" required>
+                </div>
+                <button type="submit" class="btn btn-success btn-sm"><i class="glyphicon glyphicon-upload"></i> <#LANG_ADD#></button>
+                <input type="hidden" name="view_mode" value="upload_cookie">
+            </form>
 
-<div class="modal fade" id="about" tabindex="-1" role="dialog" aria-labelledby="about1" aria-hidden="true">
-<!-- <div id="about" class="modal hide"> -->
-	<div class="modal-dialog">
-		<div class="modal-content">
-			<div class="modal-header">
-				<button class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-				<h4 class="modal-title">Google location v0.10</h4>
-			</div>
-			<div class="modal-body">
-				<div class="float-right">
-					<img src="/templates/google_location/image.png"  width="48" height="48">
-				</div>
-                <p class="float-left"> Модуль Google Location.<br>
-				Обсуждение модуля <a href="http://majordomo.smartliving.ru/forum/viewtopic.php?f=5&t=6309" target="_blank">здесь</a>.<br>
-				</p>
-				<hr size="1">
-				<p class="float-left">
-				Поддержать автора материально:
-				<ul>
-                    <li>Yandex: <a href="https://money.yandex.ru/to/410012076838296/100"  target="_blank">410012076838296</a></li>
-                    <li>WebMoney: R366396529511</li>
-                    <li><a href="https://connect.smartliving.ru/tasks/435.html"  target="_blank">Connect</a></li>
-				</ul>
-                </p>
-			</div>
-			
-			<div class="modal-footer">
-				<div class="pull-left">Telegram: <a href="https://telegram.me/Eraser1981" target="_blank">@Eraser1981</a> :)</div>
-				<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-			</div>
-		</div>
-	</div>
-</div>
-<div class="modal fade" id="help" tabindex="-1" role="dialog" aria-labelledby="help1" aria-hidden="true">
-	<div class="modal-dialog">
-		<div class="modal-content">
-			<div class="modal-header">
-				<button class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-				<h4 class="modal-title">Google location</h4>
-			</div>
-			<div class="modal-body">
-                <p><b>Как получить файл с cookies</b><br>
-                <ul>
-                    <li>Зайти на <a href='https://myaccount.google.com/?utm_source=OGB&tab=lk&utm_medium=app' target="_blank">страницу Google Account</a></li>
-                    <li>Авторизоваться там, если не авторизовались</li>
-                    <li>Сохранить файл с помощью приложения для Chrome <a href='https://chrome.google.com/webstore/detail/cookiestxt/njabckikapfpffapmjgojcnbfjonfjfg?hl=ru' target="_blank">cookies.txt</a></li>
-                </ul>
-                </p>
+            [#if COOKIES_FILES#]
+            <table class="table table-bordered table-condensed" style="background: #fff;">
+                <thead>
+                    <tr>
+                        <th>Файл</th>
+                        <th>Дата</th>
+                        <th>Розмір</th>
+                        <th>Статус</th>
+                        <th>Дія</th>
+                    </tr>
+                </thead>
+                <tbody>
+                [#begin COOKIES_FILES#]
+                    <tr>
+                        <td><b>[#NAME#]</b></td>
+                        <td>[#DATE#]</td>
+                        <td>[#SIZE#]</td>
+                        <td>
+                            [#if ERROR!=''#]
+                                <span class="label label-danger" title="[#ERROR#]"><i class="glyphicon glyphicon-warning-sign"></i> [#ERROR#]</span>
+                            [#else#]
+                                <span class="label label-success"><#LANG_GL_STATUS_OK#></span>
+                            [#endif ERROR#]
+                        </td>
+                        <td>
+                            <a class="btn btn-danger btn-xs" href="?view_mode=delete_cookie&name=[#NAME#]" title="<#LANG_DELETE#>" onClick="return confirm('<#LANG_ARE_YOU_SURE#>')"><i class="glyphicon glyphicon-trash"></i></a>
+                        </td>
+                    </tr>
+                [#end COOKIES_FILES#]
+                </tbody>
+            </table>
+            [#else COOKIES_FILES#]
+                <div class="alert alert-warning"><i class="glyphicon glyphicon-alert"></i> Файли cookies ще не завантажено. Будь ласка, завантажте cookies.txt для облікового запису.</div>
+            [#endif COOKIES_FILES#]
 
-			</div>
-			<div class="modal-footer">
-				<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-			</div>
-		</div>
-	</div>
+            <hr/>
+            <legend><#LANG_SETUP#></legend>
+            <form action="?" method="post" class="form-horizontal">
+                <div class="form-group">
+                    <label class="col-sm-4 control-label"><#LANG_GL_SETTING_TIMEOUT#></label>
+                    <div class="col-sm-2">
+                        <input class="form-control input-sm" type="number" min="1" max="60" name="timeout_update" value="<#TIMEOUT_UPDATE#>">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="col-sm-4 control-label"><#LANG_GL_LIMIT_SPEED_MIN#></label>
+                    <div class="col-sm-2">
+                        <input class="form-control input-sm" type="number" min="0" max="10" step="0.1" name="min_limit_speed" value="<#MIN_LIMIT_SPEED#>">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="col-sm-4 control-label"><#LANG_GL_LIMIT_SPEED_MAX#></label>
+                    <div class="col-sm-2">
+                        <input class="form-control input-sm" type="number" min="10" step="1" name="max_limit_speed" value="<#MAX_LIMIT_SPEED#>">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="col-sm-4 control-label"><#LANG_GL_GOOGLE_API_KEY#></label>
+                    <div class="col-sm-5">
+                        <input class="form-control input-sm" type="text" name="google_api_key" value="<#GOOGLE_API_KEY#>" placeholder="AIzaSy...">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="col-sm-4 control-label"><#LANG_GL_DEBUG#></label>
+                    <div class="col-sm-4">
+                        <label class="checkbox-inline">
+                            <input type="checkbox" name="debug" value="1"[#if DEBUG="1"#] checked[#endif#]> Увімкнути логи в DebMes
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-sm-offset-4 col-sm-4">
+                        <button type="submit" class="btn btn-primary"><#LANG_SUBMIT#></button>
+                        <input type="hidden" name="view_mode" value="update_settings">
+                    </div>
+                </div>
+            </form>
+        </fieldset>
+    </div>
 </div>
+
+<div class="alert alert-info" style="padding: 8px 15px; margin-bottom: 15px;">
+    <i class="glyphicon glyphicon-time"></i> <b><#LANG_GL_LAST_SEEN#>:</b> <#LAST_UPDATE#>
+</div>
+
+<!-- Users Table -->
+[#if LOCATIONS#]
+<div class="table-responsive">
+<table class="table table-hover table-striped table-bordered">
+    <thead>
+        <tr class="active">
+            <th style="width: 45px;"></th>
+            <th><#LANG_NAME#></th>
+            <th><#LANG_GL_LINKED_OBJECT#></th>
+            <th><#LANG_LOCATION#></th>
+            <th><#LANG_ACCURACY#></th>
+            <th><#LANG_SPEED#></th>
+            <th><#LANG_GL_BATTERY#></th>
+            <th><#LANG_GL_LAST_SEEN#></th>
+            <th>GPS Tracker</th>
+            <th style="width: 80px;"></th>
+        </tr>
+    </thead>
+    <tbody>
+        [#begin LOCATIONS#]
+        <tr [#if WARNING=="1"#]class="warning"[#endif WARNING#]>
+            <td class="text-center" style="vertical-align: middle;">
+                [#if IMAGE!=""#]
+                    <img src="[#IMAGE#]" style="width:36px; height:36px; border-radius:50%; object-fit:cover;" title="[#ID_USER#]" onerror="this.src='/img/modules/google_location.png'">
+                [#else#]
+                    <i class="glyphicon glyphicon-user" style="font-size: 24px; color: #888;"></i>
+                [#endif IMAGE#]
+            </td>
+            <td style="vertical-align: middle;">
+                <b>[#NAME#]</b><br/>
+                <small class="text-muted">[#FULLNAME#]</small>
+            </td>
+            <td style="vertical-align: middle;">
+                [#if LINKED_OBJECT!=""#]
+                    <span class="label label-primary">[#LINKED_OBJECT#]</span>
+                [#else#]
+                    <span class="text-muted">—</span>
+                [#endif#]
+            </td>
+            <td style="vertical-align: middle;">
+                <a href="#" onclick="showMapModal('[#NAME#]', [#LAT#], [#LON#], [#ACCURACY#], '[#ADDRESS#]'); return false;">
+                    <i class="glyphicon glyphicon-map-marker text-danger"></i> [#if ADDRESS!=""#][#ADDRESS#][#else#][#LAT#], [#LON#][#endif#]
+                </a>
+            </td>
+            <td style="vertical-align: middle;">[#ACCURACY#] м</td>
+            <td style="vertical-align: middle;">[#SPEED#] км/г</td>
+            <td style="vertical-align: middle;">
+                [#if BATTLEVEL!="0"#]
+                    <span class="label [#if BATTLEVEL>50#]label-success[#else#][#if BATTLEVEL>20#]label-warning[#else#]label-danger[#endif#][#endif#]">
+                        [#if CHARGING=="1"#]<i class="glyphicon glyphicon-flash"></i> [#endif#][#BATTLEVEL#]%
+                    </span>
+                [#else#]
+                    <span class="text-muted">—</span>
+                [#endif#]
+            </td>
+            <td style="vertical-align: middle;">
+                <small>[#LASTUPDATE#]</small>
+            </td>
+            <td style="vertical-align: middle; text-align: center;">
+                [#if SENDTOGPS=="1"#]
+                    <a class="btn btn-success btn-xs" href="?view_mode=send_switch&id=[#ID_USER#]" title="Вимкнути відправку в GPS Tracker"><i class="glyphicon glyphicon-ok"></i> <#LANG_ON#></a>
+                [#else#]
+                    <a class="btn btn-default btn-xs" href="?view_mode=send_switch&id=[#ID_USER#]" title="Увімкнути відправку в GPS Tracker"><i class="glyphicon glyphicon-remove"></i> <#LANG_OFF#></a>
+                [#endif SENDTOGPS#]
+            </td>
+            <td style="vertical-align: middle; text-align: center;">
+                <a href="?view_mode=user_edit&id=[#ID#]" class="btn btn-default btn-xs" title="<#LANG_EDIT#>"><i class="glyphicon glyphicon-pencil"></i></a>
+                <a href="?view_mode=user_delete&id=[#ID#]" onClick="return confirm('<#LANG_ARE_YOU_SURE#>')" class="btn btn-danger btn-xs" title="<#LANG_DELETE#>"><i class="glyphicon glyphicon-trash"></i></a>
+            </td>
+        </tr>
+        [#end LOCATIONS#]
+    </tbody>
+</table>
+</div>
+[#else LOCATIONS#]
+    <div class="alert alert-info">
+        <#LANG_GL_NO_USERS_FOUND#>
+    </div>
+[#endif LOCATIONS#]
+
+<!-- Leaflet Map Modal -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<div class="modal fade" id="mapModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title" id="mapModalTitle"><#LANG_GL_VIEW_MAP#></h4>
+            </div>
+            <div class="modal-body" style="padding: 0;">
+                <div id="leafletMap" style="height: 480px; width: 100%;"></div>
+            </div>
+            <div class="modal-footer">
+                <a id="googleMapsExtLink" href="#" target="_blank" class="btn btn-default"><i class="glyphicon glyphicon-new-window"></i> Відкрити в Google Maps</a>
+                <button type="button" class="btn btn-primary" data-dismiss="modal">Закрити</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var map = null;
+var marker = null;
+var circle = null;
+
+function showMapModal(name, lat, lon, accuracy, address) {
+    $('#mapModalTitle').text(name + ' — ' + (address || lat + ', ' + lon));
+    $('#googleMapsExtLink').attr('href', 'https://www.google.com/maps?q=' + lat + ',' + lon);
+    $('#mapModal').modal('show');
+
+    setTimeout(function() {
+        if (!map) {
+            map = L.map('leafletMap').setView([lat, lon], 16);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+        } else {
+            map.setView([lat, lon], 16);
+            map.invalidateSize();
+        }
+
+        if (marker) map.removeLayer(marker);
+        if (circle) map.removeLayer(circle);
+
+        marker = L.marker([lat, lon]).addTo(map).bindPopup('<b>' + name + '</b><br/>' + address).openPopup();
+        if (accuracy > 0) {
+            circle = L.circle([lat, lon], { radius: accuracy, color: '#3388ff', fillOpacity: 0.15 }).addTo(map);
+        }
+    }, 300);
+}
+</script>
+
+<!-- Help Modal -->
+<div class="modal fade" id="help" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title"><#LANG_GL_COOKIE_HELP#></h4>
+            </div>
+            <div class="modal-body">
+                <p><b>Як експортувати сесію Google:</b></p>
+                <ol>
+                    <li>Створіть або відкрийте виділений Google-акаунт розумного будинку у браузері (Chrome/Firefox).</li>
+                    <li>Переконайтеся, що на цей акаунт надходять геодані:
+                        <ul>
+                            <li>від сина (через додаток <b>Google Family Link</b> або Google Maps);</li>
+                            <li>від доньки (через <b>Google Maps -&gt; Передача геоданих</b>);</li>
+                            <li>від вашого основного акаунта.</li>
+                        </ul>
+                    </li>
+                    <li>Відкрийте <a href="https://www.google.com/maps" target="_blank">Google Maps</a> і переконайтеся, що всі 3 пристрої видно на карті.</li>
+                    <li>Встановіть розширення (наприклад, <i>Get cookies.txt LOCALLY</i> для Chrome/Firefox).</li>
+                    <li>Експортуйте cookies для домену <code>.google.com</code> у файл <code>cookies.txt</code>.</li>
+                    <li>Завантажте отриманий файл у налаштуваннях модуля вище.</li>
+                </ol>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Закрити</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- About Modal -->
+<div class="modal fade" id="about" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Google Location v1.0.0</h4>
+            </div>
+            <div class="modal-body text-center">
+                <img src="/img/modules/google_location.png" width="64" height="64" style="margin-bottom: 10px;" onerror="this.style.display='none'">
+                <h4>Google Location for MajorDoMo</h4>
+                <p class="text-muted">Розробник: <b>mambursoft</b></p>
+                <p>Інтеграція геопозиції Google Family Link та Google Maps Location Sharing з передачею в модуль <code>app_gpstrack</code> та об'єкти системи.</p>
+                <hr/>
+                <p><a href="https://github.com/mambursoft/majordomo-google_location" target="_blank" class="btn btn-default"><i class="glyphicon glyphicon-link"></i> GitHub Репозиторій</a></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Закрити</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 [#endif VIEW_MODE#]
 
 [#if VIEW_MODE="user_edit"#]
-<div>
-    <a class="btn btn-defaul btn-primary" href="?">&lt;&lt;&lt; <#LANG_BACK#></a>
+<div style="margin-bottom: 15px;">
+    <a class="btn btn-default" href="?">&laquo;&laquo; <#LANG_BACK#></a>
 </div>
-    [#inc user_edit.html#]
+[#inc user_edit.html#]
 [#endif VIEW_MODE#]

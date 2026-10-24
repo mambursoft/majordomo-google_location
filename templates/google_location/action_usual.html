@@ -1,175 +1,40 @@
-<!--# Action Usual #-->
-<script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU" type="text/javascript"></script>
+<!-- Google Location Front-end Widget -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<script type="text/javascript" language="javascript">
-    var updateTimeOut;
+<div id="google_location_widget_map" style="width: 100%; height: 500px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></div>
 
-    function resizeMap() {
-        $('#map').css({ 'height': (($(document).height()) - 40) + 'px', 'width': '100%' });
-        return false;
-    }
+<script>
+(function() {
+    var map = L.map('google_location_widget_map').setView([50.4501, 30.5234], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
 
-    function checkMarkerExists(temp_id) {
-        for (var i = 0, marker; marker = map.markers[i]; i++) {
-            if (marker.temp_id == temp_id) return true;
-        }
-        return false;
-    }
+    var markersGroup = L.featureGroup().addTo(map);
 
-    function getMarkerIndex(temp_id) {
-        for (var i = 0, marker; marker = map.markers[i]; i++) {
-            if (marker.temp_id == temp_id) return i;
-        }
-        return false;
-    }
-
-    function updateLocations() {
-        var url = "?ajax=1&op=getlocations";
-
-        $.ajax({
-            url: url
-        }).done(function (data) {
-            var obj = jQuery.parseJSON(data);
-            console.log(obj);
-            var now = new Date();
-            var timeOnline = new Date(now.getTime() - 60*60000);
-            var markers = obj.LOCATIONS;
-            var markersCnt = markers.length;
-            var myCollection = new ymaps.GeoObjectCollection();    
-            for (var i = 0; i < markersCnt; i++) {
-                var marker = markers[i];
-                if (marker.SENDTOGPS != "1") continue;
-                
-                var online = 'online';
-                var lastUpdate = new Date(marker.LASTUPDATE);
-                if (lastUpdate < timeOnline)
-                    online ="offline";
-                var polygonLayout = ymaps.templateLayoutFactory.createClass('<div class="placemark_layout_container"><div class="polygon_layout_'+online+'"><img width="42" height="42" src="'+marker.IMAGE+'"></img></div></div>');
-
-                var polygonPlacemark = new ymaps.Placemark(
-                    [marker.LAT, marker.LON], 
-                    {
-                        hintContent: marker.HTML
-                    }, 
-                    {
-                        iconLayout: polygonLayout,
-                        iconShape: {   
-                            type: 'Polygon',
-                            coordinates: [
-                                [[-28,-76],[28,-76],[28,-20],[12,-20],[0,-4],[-12,-20],[-28,-20]]
-                            ]
+    function loadGoogleLocations() {
+        $.getJSON('/ajax/google_location.html?op=getlocations', function(data) {
+            if (data && data.LOCATIONS && data.LOCATIONS.length > 0) {
+                markersGroup.clearLayers();
+                data.LOCATIONS.forEach(function(item) {
+                    if (item.LAT != 0 && item.LON != 0) {
+                        var marker = L.marker([item.LAT, item.LON]).bindPopup(item.HTML);
+                        markersGroup.addLayer(marker);
+                        if (item.ACCURACY > 0) {
+                            var circle = L.circle([item.LAT, item.LON], { radius: parseFloat(item.ACCURACY), color: '#3388ff', fillOpacity: 0.12 });
+                            markersGroup.addLayer(circle);
                         }
                     }
-                );
-                myCollection.add(polygonPlacemark);
+                });
+                if (markersGroup.getLayers().length > 0) {
+                    map.fitBounds(markersGroup.getBounds().pad(0.1));
+                }
             }
-            map.geoObjects.add(myCollection);
-                
-            map.setBounds(myCollection.getBounds(), {checkZoomRange:true});
-            //updateTimeOut = setTimeout('legendUpdate();', 5000);
         });
-        return false;
     }
-    
-    var map;
-    var startLat = 58.5795;
-    var startLon = 49.6888;
-    // HTML5 геолокация
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(function (position) {
-            startLat = position.coords.latitude;
-            startLon = position.coords.longitude;
-        }, function () {
-            // ошибка геолокации
-        });
-    } else { /* Браузер не поддерживает геолокацию */ }
 
-    $(document).ready(function () {
-        ymaps.ready(function () {
-            map = new ymaps.Map('map', {
-                center: [startLat, startLon],
-                zoom: 17,
-                type: 'yandex#map'
-            });
-            legendUpdate();
-            resizeMap();
-        });
-    });
-
-    function legendUpdate() {
-        map.geoObjects.removeAll();
-        updateLocations();
-        return false;
-    }
+    loadGoogleLocations();
+    setInterval(loadGoogleLocations, 60000);
+})();
 </script>
-
-<style>
-        /* Макет метки с "хвостиком" */
-        .polygon_layout_online {
-            position: relative;
-            background: #ffffff;
-            border: 4px solid green;
-            width: 50px; 
-            height: 50px;
-            position: absolute;
-            left: -28px;
-            top: -76px;
-            color: green;
-        }
-        
-        .polygon_layout_online:after, .polygon_layout:before {
-            top: 100%;
-            left: 50%;
-            border: solid transparent;
-            content: " ";
-            height: 0;
-            width: 0;
-            position: absolute;
-        }
-        
-        .polygon_layout_online:after {
-            border-top-color: green;
-            border-width: 10px;
-            margin-left: -10px;
-        }
-        
-        .polygon_layout_online:before {
-            border-top-color: green;
-            border-width: 16px;
-            margin-left: -16px;
-        }
-        .polygon_layout_offline {
-            position: relative;
-            background: #ffffff;
-            border: 4px solid red;
-            width: 50px; 
-            height: 50px;
-            position: absolute;
-            left: -28px;
-            top: -76px;
-            color: red;
-        }
-        
-        .polygon_layout_offline:after, .polygon_layout:before {
-            top: 100%;
-            left: 50%;
-            border: solid transparent;
-            content: " ";
-            height: 0;
-            width: 0;
-            position: absolute;
-        }
-        
-        .polygon_layout_offline:after {
-            border-top-color: red;
-            border-width: 10px;
-            margin-left: -10px;
-        }
-        
-        .polygon_layout_offline:before {
-            border-top-color: red;
-            border-width: 16px;
-            margin-left: -16px;
-        }
-</style>
-<div id="map" style="width: 100%; height: 100%;"></div>

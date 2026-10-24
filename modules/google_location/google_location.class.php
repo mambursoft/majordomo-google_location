@@ -1,602 +1,702 @@
 <?php
 /**
-* Google Location 
+* Google Location Module for MajorDoMo
+* Fork & Enhancements by mambursoft
+*
+* Features:
+* - Google Family Link & Google Maps Location Sharing integration
+* - Direct feed to MajorDoMo GPS Tracker (app_gpstrack via gps.php)
+* - Direct binding to MajorDoMo Objects (e.g. Users.Son, Users.Admin)
+* - Google Maps Reverse Geocoding API integration (optional)
+* - Leaflet / OpenStreetMap visual tracking in Admin & User view
+* - Resilient CookieJar session handling for Google RPC endpoints
+*
 * @package project
-* @author Wizard <sergejey@gmail.com>
-* @copyright http://majordomo.smartliving.ru/ (c)
-* @version 0.1 (wizard, 07:04:47 [Apr 10, 2019])
+* @author mambursoft <https://github.com/mambursoft>
+* @version 1.0.0
 */
-//
-//
+
 class google_location extends module {
-/**
-* google_location
-*
-* Module class constructor
-*
-* @access private
-*/
-function __construct() {
-  $this->name="google_location";
-  $this->title="Google Location";
-  $this->module_category="<#LANG_SECTION_APPLICATIONS#>";
-  $this->checkInstalled();
-}
-/**
-* saveParams
-*
-* Saving module parameters
-*
-* @access public
-*/
-function saveParams($data=1) {
- $p=array();
- if (IsSet($this->id)) {
-  $p["id"]=$this->id;
- }
- if (IsSet($this->view_mode)) {
-  $p["view_mode"]=$this->view_mode;
- }
- if (IsSet($this->edit_mode)) {
-  $p["edit_mode"]=$this->edit_mode;
- }
- if (IsSet($this->tab)) {
-  $p["tab"]=$this->tab;
- }
- return parent::saveParams($p);
-}
-/**
-* getParams
-*
-* Getting module parameters from query string
-*
-* @access public
-*/
-function getParams() {
-  global $id;
-  global $mode;
-  global $view_mode;
-  global $edit_mode;
-  global $tab;
-  if (isset($id)) {
-   $this->id=$id;
-  }
-  if (isset($mode)) {
-   $this->mode=$mode;
-  }
-  if (isset($view_mode)) {
-   $this->view_mode=$view_mode;
-  }
-  if (isset($edit_mode)) {
-   $this->edit_mode=$edit_mode;
-  }
-  if (isset($tab)) {
-   $this->tab=$tab;
-  }
-}
-/**
-* Run
-*
-* Description
-*
-* @access public
-*/
-function run() {
- global $session;
-  $out=array();
-  if ($this->action=='admin') {
-   $this->admin($out);
-  } else {
-   $this->usual($out);
-  }
-  if (IsSet($this->owner->action)) {
-   $out['PARENT_ACTION']=$this->owner->action;
-  }
-  if (IsSet($this->owner->name)) {
-   $out['PARENT_NAME']=$this->owner->name;
-  }
-  $out['VIEW_MODE']=$this->view_mode;
-  $out['EDIT_MODE']=$this->edit_mode;
-  $out['MODE']=$this->mode;
-  $out['ACTION']=$this->action;
-  $this->data=$out;
-  $p=new parser(DIR_TEMPLATES.$this->name."/".$this->name.".html", $this->data, $this);
-  $this->result=$p->result;
-}
-/**
-* BackEnd
-*
-* Module backend
-*
-* @access public
-*/
-function debug($content) {
-    if($this->config['DEBUG'])
-        $this->log(print_r($content,true));
-}
 
-function log($message) {
-    //echo $message . "\n";
-    // DEBUG MESSAGE LOG
-    DebMes($message, 'google_location'); 
-}
-    
+    /**
+    * Module class constructor
+    */
+    function __construct() {
+        $this->name = "google_location";
+        $this->title = "Google Location";
+        $this->module_category = "<#LANG_SECTION_APPLICATIONS#>";
+        $this->checkInstalled();
+    }
 
-function admin(&$out) {
- $this->getConfig();
- $directory_cookies=ROOT."cms/files/google_location/";
- if (!file_exists($directory_cookies)) {
-    mkdir($directory_cookies, 0777, true);}
- if ($this->view_mode=='update_settings') {
-   global $timeout_update;
-   $this->config['TIMEOUT_UPDATE']=$timeout_update;
-   global $min_limit_speed;
-   $this->config['MIN_LIMIT_SPEED']=$min_limit_speed;
-   global $max_limit_speed;
-   $this->config['MAX_LIMIT_SPEED']=$max_limit_speed;
-   global $debug;
-   $this->config['DEBUG']=$debug;
-   if ($this->config['TIMEOUT_UPDATE'] == '')  $this->config['TIMEOUT_UPDATE'] = 1;
-   if ($this->config['MIN_LIMIT_SPEED'] == '')  $this->config['MIN_LIMIT_SPEED'] = 0;
-   if ($this->config['MAX_LIMIT_SPEED'] == '')  $this->config['MAX_LIMIT_SPEED'] = 200;
-   $this->saveConfig();
-   $this->redirect("?");
-   return;
- }
- $out['TIMEOUT_UPDATE']=$this->config['TIMEOUT_UPDATE'];
- $out['LAST_UPDATE']=$this->config['LAST_UPDATE'];
- $out['MIN_LIMIT_SPEED']=$this->config['MIN_LIMIT_SPEED'];
- $out['MAX_LIMIT_SPEED']=$this->config['MAX_LIMIT_SPEED'];
- if ($out['LAST_UPDATE'] == '')
-     $out['LAST_UPDATE'] = 1;
- if ($out['MIN_LIMIT_SPEED'] == '')
-     $out['MIN_LIMIT_SPEED'] = 0;
- if ($out['MAX_LIMIT_SPEED'] == '')
-     $out['MAX_LIMIT_SPEED'] = 200;
- $out['DEBUG']=$this->config['DEBUG'];
- if($this->view_mode == 'user_edit') {
-  $this->edit_user($out, $this->id);
- }
- if($this->view_mode == 'user_delete') {
-    $this->delete_user($this->id);
-   $this->redirect("?");
-   return;
- }
- if ($this->view_mode=='upload_cookie') {
+    /**
+    * Save module parameters
+    */
+    function saveParams($data = 1) {
+        $p = array();
+        if (isset($this->id))        $p["id"] = $this->id;
+        if (isset($this->view_mode)) $p["view_mode"] = $this->view_mode;
+        if (isset($this->edit_mode)) $p["edit_mode"] = $this->edit_mode;
+        if (isset($this->tab))       $p["tab"] = $this->tab;
+        return parent::saveParams($p);
+    }
 
-   global $file;
-   global $file_name;
-   copy($file, $directory_cookies.$file_name);
-   $this->redirect("?");
-   return;
- } 
- if($this->view_mode == 'delete_cookie') {
-     global $name;
-     $this->debug('delete cookie '.$name);
-     unlink($directory_cookies.$name);
-   $this->redirect("?");
-   return;
- }
- if ($this->view_mode=='update_location') {
-   $this->updateLocation();
-   $this->redirect("?");
-   return;
- }
- if ($this->view_mode=='send_switch') {
-    global $id;
-    $rec = SQLSelectOne("select * from google_locations where ID_USER='".$id."'");
-    if ($rec['ID']) {
-        if ($rec['SENDTOGPS']==1)
-            $rec['SENDTOGPS']=0;
-        else
-            $rec['SENDTOGPS']=1;
-        SQLUpdate('google_locations', $rec); // update
+    /**
+    * Get module parameters
+    */
+    function getParams() {
+        global $id, $mode, $view_mode, $edit_mode, $tab;
+        if (isset($id))        $this->id = $id;
+        if (isset($mode))      $this->mode = $mode;
+        if (isset($view_mode)) $this->view_mode = $view_mode;
+        if (isset($edit_mode)) $this->edit_mode = $edit_mode;
+        if (isset($tab))       $this->tab = $tab;
     }
-    $this->redirect("?");
-    return;
- }
- $locations = SQLSelect("select * from google_locations");
- for($i=0;$i<count($locations);$i++) {
-     if (time() - strtotime($locations[$i]["LASTUPDATE"]) > 60*60)
-        $locations[$i]['WARNING'] = '1';
- }
- $out['LOCATIONS'] = $locations;
- 
- $cookies_files = [];//array_diff(scandir($directory_cookies), array('..', '.'));
- if($handle = opendir($directory_cookies)){
-    while(false !== ($file = readdir($handle))) {
-        if($file != "." && $file != "..")  {
-            $cookies_files[] = array("NAME" => $file, "DATE"=>date("F d Y H:i:s", filectime($directory_cookies.$file)), "SIZE"=>$this->sizeFilter(filesize($directory_cookies.$file)), "ERROR"=>$this->config["ERROR_".$file]); 
-        }
-    }
-    closedir( $handle );
- }
- if ($cookies_files)
- {
-    $this->debug($cookies_files);
-    $out['COOKIES_FILES'] = $cookies_files;
- }
- 
-}
-public function sizeFilter( $bytes )
-{
-    $label = array( 'B', 'KB', 'MB', 'GB', 'TB', 'PB' );
-    for( $i = 0; $bytes >= 1024 && $i < ( count( $label ) -1 ); $bytes /= 1024, $i++ );
-    return( round( $bytes, 2 ) . " " . $label[$i] );
-}
 
-function edit_user(&$out, $id) {
-    require(DIR_MODULES . $this->name . '/user_edit.inc.php');
-}
-function delete_user($id) {
-    $rec = SQLSelectOne("SELECT * FROM google_locations WHERE ID='$id'");
-    SQLExec("DELETE FROM google_locations WHERE ID='" . $rec['ID'] . "'");
-}
+    /**
+    * Main entry point
+    */
+    function run() {
+        global $session;
+        $out = array();
 
-/**
-* FrontEnd
-*
-* Module frontend
-*
-* @access public
-*/
-function usual(&$out) {
-    global $ajax;
-    global $op;
-    if ($ajax) {
-        if (!headers_sent()) {
-            header ("HTTP/1.0: 200 OK\n");
-            header ('Content-Type: text/html; charset=utf-8');
-        }
-        
-        if ($op=='getlocations') {
-            $data=array();
-            $markers=SQLSelect("SELECT * FROM google_locations");
-            $total=count($markers);
-            for($i=0;$i<$total;$i++) {
-                $markers[$i]['HTML']="<b>".$markers[$i]['FULLNAME']."</b></br>";
-                $markers[$i]['HTML'].=LANG_LATEST_UPDATES.": ".$markers[$i]['LASTUPDATE']."</br>";
-                $markers[$i]['HTML'].=LANG_BATTERY_LEVEL.": ";
-                if ($markers[$i]['CHARGING']==1)
-                    $markers[$i]['HTML'].="<i class='glyphicon glyphicon-flash'> </i>";
-                $markers[$i]['HTML'].=$markers[$i]['BATTLEVEL']."%";
-                $data['LOCATIONS'][]=$markers[$i];
-            }
-            echo json_encode($data);
-        }
-        
-        exit;
-    }
-}
- function processSubscription($event, $details='') {
-  $this->getConfig();
-  if ($event=='MINUTELY') {
-      $timeout = $this->config['TIMEOUT_UPDATE'];
-      if ($timeout == '0') return;
-      if ($timeout == '') $timeout = 1;
-      $m=date('i',time());
-      if ($m % $timeout == 0)
-        $this->updateLocation();
-  }
- }
- 
-     // Find data in module
- function findData($data) {
-    $res = array();
-    $cmds = SQLSelect("SELECT `ID`,`NAME` FROM `google_locations` where `NAME` like '%" . DBSafe($data) . "%' OR `FULLNAME` like '%" . DBSafe($data) . "%' OR `ID_USER` like '%" . DBSafe($data) . "%' OR `ADDRESS` like '%" . DBSafe($data) . "%'  order by NAME");
-    foreach($cmds as $cmd){
-        $res[]= '<a href="/panel/google_location.html?md=google_location&inst=adm&view_mode=user_edit&id=' . $cmd['ID'] . '.html">' . $cmd['NAME'].'</a>';
-    }
-    return $res;
- }
- 
- public function updateLocation() {
-    $locations = [];
-    $directory_cookies=ROOT."cms/cached/google_location/";
-	 if (!file_exists($directory_cookies)) $directory_cookies=ROOT."cms/files/google_location/"; //для рабочих (у кого уже есть куки в старой папке)
-    $cookies = array_diff(scandir($directory_cookies), array('..', '.'));
-    foreach ($cookies as $cookie)
-    {
-        $locations = array_merge($locations,$this->getLocation($directory_cookies.$cookie));
-    }
-    foreach ($locations as $location) {
-        $rec = SQLSelectOne("select * from google_locations where ID_USER='".$location["id"]."'");
-        
-        if ($location['lat'] == 0 && $location['lon'] == 0)
-        {
-            if (time() - strtotime($rec["LASTUPDATE"]) > 24*60*60)
-            {
-                if(method_exists($this, 'sendnotification')) {
-                    $this->sendnotification('Некорректные данные пользователя '.$rec['FULLNAME'].' , проверьте настройки!', 'warning');
-                }
-            }
-            continue;
-        }
-        
-        if ($rec['ID']) {
-            if ($rec['LASTUPDATE'] != date('Y-m-d H:i:s' ,(int)($location['timestamp']/1000)) && $rec["SENDTOGPS"]==1)
-            {
-                $location['speed'] = $this->getSpeed($rec, $location);
-                if ($this->config['MIN_LIMIT_SPEED'] > $location['speed'])
-                    $location['speed'] = 0;
-                if ($this->config['MAX_LIMIT_SPEED'] > abs($location['speed'] - $rec['SPEED']))
-                    $this->sendToGps($location);
-                $rec['SPEED'] = $location['speed'];
-            }
-            
-            if (time() - strtotime($rec["LASTUPDATE"]) > 24*60*60)
-            {
-                if(method_exists($this, 'sendnotification')) {
-                    $this->sendnotification('Данные пользователя '.$rec['FULLNAME'].' не обновляются, проверьте настройки!', 'warning');
-                }
-            }
-        }
-        
-        $rec['LASTUPDATE'] = date('Y-m-d H:i:s' ,(int)($location['timestamp']/1000));
-        $rec['ADDRESS'] = $location['address'];
-        $rec['LAT'] = $location['lat'];
-        $rec['LON'] = $location['lon'];
-        $rec['ACCURACY'] = $location['accuracy'];
-        if ($location['battery']!=NULL)
-            $rec['BATTLEVEL'] = $location['battery'];
-        $rec['CHARGING'] = $location['charging'];
-        if ($rec['ID']) {
-            SQLUpdate('google_locations', $rec); // update
+        if ($this->action == 'admin') {
+            $this->admin($out);
         } else {
-            $rec['ID_USER'] = $location['id'];
-            $rec['NAME'] = $location['name'];
-            $rec['FULLNAME'] = $location['fullname'];
-            $rec['IMAGE'] = $location['image'];
-            $rec['SPEED'] = 0;
-            $rec['ID']=SQLInsert('google_locations', $rec); // adding new record
-            if(method_exists($this, 'sendnotification')) {
-                $this->sendnotification('Добавлен новый пользователь '.$rec['FULLNAME'], 'info');
+            $this->usual($out);
+        }
+
+        if (isset($this->owner->action)) $out['PARENT_ACTION'] = $this->owner->action;
+        if (isset($this->owner->name))   $out['PARENT_NAME']   = $this->owner->name;
+
+        $out['VIEW_MODE'] = $this->view_mode;
+        $out['EDIT_MODE'] = $this->edit_mode;
+        $out['MODE']      = $this->mode;
+        $out['ACTION']    = $this->action;
+        $this->data       = $out;
+
+        $p = new parser(DIR_TEMPLATES . $this->name . "/" . $this->name . ".html", $this->data, $this);
+        $this->result = $p->result;
+    }
+
+    /**
+    * Debug helper
+    */
+    function debug($content) {
+        if (!empty($this->config['DEBUG'])) {
+            $this->log(print_r($content, true));
+        }
+    }
+
+    /**
+    * Log to MajorDoMo system log
+    */
+    function log($message) {
+        DebMes($message, 'google_location');
+    }
+
+    /**
+    * Admin panel logic
+    */
+    function admin(&$out) {
+        $this->getConfig();
+        $directory_cookies = ROOT . "cms/cached/google_location/";
+        if (!file_exists($directory_cookies)) {
+            mkdir($directory_cookies, 0777, true);
+        }
+
+        // Save module settings
+        if ($this->view_mode == 'update_settings') {
+            global $timeout_update, $min_limit_speed, $max_limit_speed, $google_api_key, $debug;
+
+            $this->config['TIMEOUT_UPDATE']  = (int)$timeout_update;
+            $this->config['MIN_LIMIT_SPEED']  = (float)$min_limit_speed;
+            $this->config['MAX_LIMIT_SPEED']  = (float)$max_limit_speed;
+            $this->config['GOOGLE_API_KEY']   = trim($google_api_key);
+            $this->config['DEBUG']            = (int)$debug;
+
+            if ($this->config['TIMEOUT_UPDATE'] <= 0) $this->config['TIMEOUT_UPDATE'] = 1;
+            if ($this->config['MIN_LIMIT_SPEED'] < 0) $this->config['MIN_LIMIT_SPEED'] = 0;
+            if ($this->config['MAX_LIMIT_SPEED'] <= 0) $this->config['MAX_LIMIT_SPEED'] = 200;
+
+            $this->saveConfig();
+            $this->redirect("?");
+            return;
+        }
+
+        $out['TIMEOUT_UPDATE']  = isset($this->config['TIMEOUT_UPDATE']) ? $this->config['TIMEOUT_UPDATE'] : 1;
+        $out['LAST_UPDATE']     = isset($this->config['LAST_UPDATE']) ? $this->config['LAST_UPDATE'] : '';
+        $out['MIN_LIMIT_SPEED'] = isset($this->config['MIN_LIMIT_SPEED']) ? $this->config['MIN_LIMIT_SPEED'] : 0;
+        $out['MAX_LIMIT_SPEED'] = isset($this->config['MAX_LIMIT_SPEED']) ? $this->config['MAX_LIMIT_SPEED'] : 200;
+        $out['GOOGLE_API_KEY']  = isset($this->config['GOOGLE_API_KEY']) ? $this->config['GOOGLE_API_KEY'] : '';
+        $out['DEBUG']           = isset($this->config['DEBUG']) ? $this->config['DEBUG'] : 0;
+
+        // Edit user
+        if ($this->view_mode == 'user_edit') {
+            $this->edit_user($out, $this->id);
+            return;
+        }
+
+        // Delete user
+        if ($this->view_mode == 'user_delete') {
+            $this->delete_user($this->id);
+            $this->redirect("?");
+            return;
+        }
+
+        // Upload cookie file
+        if ($this->view_mode == 'upload_cookie') {
+            global $file, $file_name;
+            if (!empty($file) && !empty($file_name)) {
+                $target = $directory_cookies . basename($file_name);
+                copy($file, $target);
+                chmod($target, 0666);
+            }
+            $this->redirect("?");
+            return;
+        }
+
+        // Delete cookie file
+        if ($this->view_mode == 'delete_cookie') {
+            global $name;
+            $clean_name = basename($name);
+            $file_to_del = $directory_cookies . $clean_name;
+            if (file_exists($file_to_del)) {
+                unlink($file_to_del);
+            }
+            $this->redirect("?");
+            return;
+        }
+
+        // Manual trigger location update
+        if ($this->view_mode == 'update_location') {
+            $this->updateLocation();
+            $this->redirect("?");
+            return;
+        }
+
+        // Switch send to GPS Tracker
+        if ($this->view_mode == 'send_switch') {
+            global $id;
+            $rec = SQLSelectOne("SELECT * FROM google_locations WHERE ID_USER='" . DBSafe($id) . "'");
+            if (!empty($rec['ID'])) {
+                $rec['SENDTOGPS'] = ($rec['SENDTOGPS'] == 1) ? 0 : 1;
+                SQLUpdate('google_locations', $rec);
+            }
+            $this->redirect("?");
+            return;
+        }
+
+        // Retrieve location records
+        $locations = SQLSelect("SELECT * FROM google_locations ORDER BY NAME ASC");
+        $total_locs = count($locations);
+        for ($i = 0; $i < $total_locs; $i++) {
+            if (!empty($locations[$i]["LASTUPDATE"])) {
+                if (time() - strtotime($locations[$i]["LASTUPDATE"]) > 3600) {
+                    $locations[$i]['WARNING'] = '1';
+                }
+            } else {
+                $locations[$i]['WARNING'] = '1';
+            }
+        }
+        $out['LOCATIONS'] = $locations;
+
+        // List cookie files
+        $cookies_files = array();
+        if ($handle = opendir($directory_cookies)) {
+            while (false !== ($cfile = readdir($handle))) {
+                if ($cfile != "." && $cfile != ".." && !is_dir($directory_cookies . $cfile)) {
+                    $cpath = $directory_cookies . $cfile;
+                    $error_key = 'ERROR_' . $cfile;
+                    $err_text = isset($this->config[$error_key]) ? $this->config[$error_key] : '';
+                    $cookies_files[] = array(
+                        "NAME"  => $cfile,
+                        "DATE"  => date("Y-m-d H:i:s", filemtime($cpath)),
+                        "SIZE"  => $this->sizeFilter(filesize($cpath)),
+                        "ERROR" => $err_text
+                    );
+                }
+            }
+            closedir($handle);
+        }
+        if (!empty($cookies_files)) {
+            $out['COOKIES_FILES'] = $cookies_files;
+        }
+    }
+
+    /**
+    * Format bytes helper
+    */
+    public function sizeFilter($bytes) {
+        $label = array('B', 'KB', 'MB', 'GB');
+        for ($i = 0; $bytes >= 1024 && $i < (count($label) - 1); $bytes /= 1024, $i++);
+        return (round($bytes, 2) . " " . $label[$i]);
+    }
+
+    /**
+    * Edit user details
+    */
+    function edit_user(&$out, $id) {
+        require(DIR_MODULES . $this->name . '/user_edit.inc.php');
+    }
+
+    /**
+    * Delete user from local tracking table
+    */
+    function delete_user($id) {
+        $rec = SQLSelectOne("SELECT * FROM google_locations WHERE ID='" . (int)$id . "'");
+        if (!empty($rec['ID'])) {
+            SQLExec("DELETE FROM google_locations WHERE ID='" . $rec['ID'] . "'");
+        }
+    }
+
+    /**
+    * Front-end widget & API calls
+    */
+    function usual(&$out) {
+        global $ajax, $op;
+
+        if ($ajax) {
+            if (!headers_sent()) {
+                header("HTTP/1.0: 200 OK\n");
+                header('Content-Type: application/json; charset=utf-8');
             }
 
+            if ($op == 'getlocations') {
+                $data = array('LOCATIONS' => array());
+                $markers = SQLSelect("SELECT * FROM google_locations");
+                foreach ($markers as $m) {
+                    $html = "<b>" . htmlspecialchars($m['FULLNAME']) . "</b><br/>";
+                    $html .= (!empty($m['ADDRESS']) ? htmlspecialchars($m['ADDRESS']) . "<br/>" : "");
+                    $html .= "Оновлено: " . $m['LASTUPDATE'] . "<br/>";
+                    $html .= "Батарея: " . ($m['CHARGING'] == 1 ? "⚡ " : "") . $m['BATTLEVEL'] . "%";
+                    $m['HTML'] = $html;
+                    $data['LOCATIONS'][] = $m;
+                }
+                echo json_encode($data);
+                exit;
+            }
         }
     }
-    
-    $ids = implode(",", array_column($locations, 'id'));
-    if ($ids)
-    {
-        $locs = SQLSelect("select * from google_locations where ID_USER not in (".$ids.")");
-        foreach ($locs as $loc) {
-            if(method_exists($this, 'sendnotification')) {
-                $this->sendnotification('Данные пользователя '.$rec['FULLNAME'].' не приходят, проверьте настройки Share Location!', 'warning');
-            }   
+
+    /**
+    * Periodic timer subscription (MINUTELY)
+    */
+    function processSubscription($event, $details = '') {
+        $this->getConfig();
+        if ($event == 'MINUTELY') {
+            $timeout = isset($this->config['TIMEOUT_UPDATE']) ? (int)$this->config['TIMEOUT_UPDATE'] : 1;
+            if ($timeout <= 0) return;
+            $minute = (int)date('i');
+            if ($minute % $timeout == 0) {
+                $this->updateLocation();
+            }
         }
     }
-    $this->config['LAST_UPDATE'] = date('Y-m-d H:i:s');
-    $this->saveConfig();
- }
- public function getSpeed($last,$new)
- {
-     $time_last = strtotime($last['LASTUPDATE']);
-     $time_new = (int)($new['timestamp']/1000);
-     $dist = $this->calculateTheDistance($last['LAT'],$last['LON'],$new['lat'],$new['lon']);
-     $diff = $time_new - $time_last;
-     return round($dist / $diff * 3.6 , 2); // km/h
-;
- }
-  /**
-  * Calculate distance between two GPS coordinates
-  * @param mixed $latA First coord latitude
-  * @param mixed $lonA First coord longitude
-  * @param mixed $latB Second coord latitude
-  * @param mixed $lonB Second coord longitude
-  * @return double
-  */
- function calculateTheDistance($latA, $lonA, $latB, $lonB)
- {
-   define('EARTH_RADIUS', 6372795);
-   
-   $lat1  = $latA * M_PI / 180;
-   $lat2  = $latB * M_PI / 180;
-   $long1 = $lonA * M_PI / 180;
-   $long2 = $lonB * M_PI / 180;
 
-   $cl1 = cos($lat1);
-   $cl2 = cos($lat2);
-   $sl1 = sin($lat1);
-   $sl2 = sin($lat2);
+    /**
+    * Core location sync logic
+    */
+    public function updateLocation() {
+        $locations = array();
+        $directory_cookies = ROOT . "cms/cached/google_location/";
+        if (!file_exists($directory_cookies)) {
+            $directory_cookies = ROOT . "cms/files/google_location/";
+        }
 
-   $delta  = $long2 - $long1;
-   $cdelta = cos($delta);
-   $sdelta = sin($delta);
+        if (file_exists($directory_cookies)) {
+            $files = array_diff(scandir($directory_cookies), array('..', '.'));
+            foreach ($files as $cookie_file) {
+                $full_path = $directory_cookies . $cookie_file;
+                if (!is_dir($full_path)) {
+                    $parsed = $this->getLocation($full_path);
+                    if (is_array($parsed) && count($parsed) > 0) {
+                        $locations = array_merge($locations, $parsed);
+                    }
+                }
+            }
+        }
 
-   $y = sqrt(pow($cl2 * $sdelta, 2) + pow($cl1 * $sl2 - $sl1 * $cl2 * $cdelta, 2));
-   $x = $sl1 * $sl2 + $cl1 * $cl2 * $cdelta;
+        foreach ($locations as $location) {
+            if (empty($location['id'])) continue;
 
-   $ad = atan2($y, $x);
-   
-   $dist = round($ad * EARTH_RADIUS);
+            $rec = SQLSelectOne("SELECT * FROM google_locations WHERE ID_USER='" . DBSafe($location["id"]) . "'");
 
-   return $dist;
- }
+            // Skip faulty 0,0 coordinates
+            if ($location['lat'] == 0 && $location['lon'] == 0) {
+                continue;
+            }
 
- public function sendToGps($location)
- {
-    $req = BASE_URL."/gps.php?latitude=".$location['lat']."&longitude=".$location['lon']."&deviceid=".$location['id'].
-    "&provider=google_location&accuracy=".$location['accuracy']."&address=".urlencode($location['address']);
-    if($location['battery']>0){
-        $req .= "&battlevel=".$location['battery']."&charging=".$location['charging'];}
-    $req .= "&speed=".$location['speed'];
-    $contents = getURLBackground($req,0); 
- }
+            // Reverse Geocoding via Google Maps API if address is empty and key is provided
+            if (empty($location['address']) && !empty($this->config['GOOGLE_API_KEY'])) {
+                $location['address'] = $this->reverseGeocodeGoogle($location['lat'], $location['lon']);
+            }
 
- public function getLocation($cookie_file) {
-    $path_parts = pathinfo($cookie_file);
-    try {
-        $result = $this->getLocationData($cookie_file);
-	} catch (Exception $e) {
-        $this->log($e);
-        $this->config['ERROR_'.$path_parts['basename']]=$e->getMessage();
-        return [];
-	}
-    $this->config['ERROR_'.$path_parts['basename']]='';
-	$return = array();
-    if (isset($result[9]))
-    {
-        $return[] = array(
-			'id' => crc32($cookie_file),
-			'name' => $path_parts['filename'],
-			'fullname' => $path_parts['filename'],
-			'image' => '',
-			'address' => $result[9][1][4],
-			'timestamp' => $result[9][1][2],
-			'lat' => $result[9][1][1][2],
-            'lon' => $result[9][1][1][1],
-			'accuracy' => $result[9][1][3],
-            'battery' => 0,
-            'charging' => 0,
-		);
+            // Existing user handling
+            if (!empty($rec['ID'])) {
+                $location_ts = (int)($location['timestamp'] / 1000);
+                $new_lastupdate = date('Y-m-d H:i:s', $location_ts);
+
+                if ($rec['LASTUPDATE'] != $new_lastupdate && $rec["SENDTOGPS"] == 1) {
+                    $location['speed'] = $this->getSpeed($rec, $location);
+
+                    if ($this->config['MIN_LIMIT_SPEED'] > $location['speed']) {
+                        $location['speed'] = 0;
+                    }
+
+                    $delta_speed = abs($location['speed'] - (float)$rec['SPEED']);
+                    if ($this->config['MAX_LIMIT_SPEED'] >= $delta_speed) {
+                        $this->sendToGps($location);
+                    }
+                    $rec['SPEED'] = $location['speed'];
+                }
+
+                $rec['LASTUPDATE'] = $new_lastupdate;
+                if (!empty($location['address'])) $rec['ADDRESS'] = $location['address'];
+                $rec['LAT'] = $location['lat'];
+                $rec['LON'] = $location['lon'];
+                $rec['ACCURACY'] = $location['accuracy'];
+                if ($location['battery'] !== null) {
+                    $rec['BATTLEVEL'] = (int)$location['battery'];
+                }
+                $rec['CHARGING'] = (int)$location['charging'];
+
+                SQLUpdate('google_locations', $rec);
+
+                // Update linked MajorDoMo Object if defined
+                $this->updateLinkedObject($rec);
+
+            } else {
+                // New user discovered
+                $rec = array();
+                $rec['ID_USER'] = $location['id'];
+                $rec['NAME'] = !empty($location['name']) ? $location['name'] : 'User ' . substr($location['id'], 0, 6);
+                $rec['FULLNAME'] = !empty($location['fullname']) ? $location['fullname'] : $rec['NAME'];
+                $rec['IMAGE'] = !empty($location['image']) ? $location['image'] : '';
+                $rec['LASTUPDATE'] = date('Y-m-d H:i:s', (int)($location['timestamp'] / 1000));
+                $rec['ADDRESS'] = !empty($location['address']) ? $location['address'] : '';
+                $rec['LAT'] = $location['lat'];
+                $rec['LON'] = $location['lon'];
+                $rec['ACCURACY'] = $location['accuracy'];
+                $rec['SPEED'] = 0;
+                $rec['BATTLEVEL'] = (int)$location['battery'];
+                $rec['CHARGING'] = (int)$location['charging'];
+                $rec['SENDTOGPS'] = 1; // Auto forward to app_gpstrack
+                $rec['LINKED_OBJECT'] = '';
+
+                $rec['ID'] = SQLInsert('google_locations', $rec);
+
+                if (method_exists($this, 'sendnotification')) {
+                    $this->sendnotification('Додано нового користувача Google Location: ' . $rec['FULLNAME'], 'info');
+                }
+
+                $this->sendToGps($location);
+            }
+        }
+
+        $this->config['LAST_UPDATE'] = date('Y-m-d H:i:s');
+        $this->saveConfig();
     }
-	if (isset($result[0]))
-    {
-      $result = $result[0];
-      foreach ($result as $user) {
-		$return[] = array(
-			'id' => $user[6][0],
-			'name' => $user[6][3],
-			'fullname' => $user[6][2],
-			'image' => $user[0][1],
-			'address' => $user[1][4],
-			'timestamp' => $user[1][2],
-			'lat' => $user[1][1][2],
-            'lon' => $user[1][1][1],
-			'accuracy' => $user[1][3],
-			'battery' => $user[13][1],
-            'charging' => $user[13][0],
-		);
-	  }
+
+    /**
+    * Update linked MajorDoMo Object properties
+    */
+    public function updateLinkedObject($rec) {
+        if (empty($rec['LINKED_OBJECT'])) return;
+
+        $object_name = trim($rec['LINKED_OBJECT']);
+        if (!objectExists($object_name)) return;
+
+        setGlobal($object_name . '.Coordinates', $rec['LAT'] . ',' . $rec['LON']);
+        setGlobal($object_name . '.Latitude', $rec['LAT']);
+        setGlobal($object_name . '.Longitude', $rec['LON']);
+        setGlobal($object_name . '.Accuracy', $rec['ACCURACY']);
+        setGlobal($object_name . '.Speed', $rec['SPEED']);
+        setGlobal($object_name . '.BatteryLevel', $rec['BATTLEVEL']);
+        setGlobal($object_name . '.Charging', $rec['CHARGING']);
+        setGlobal($object_name . '.Address', $rec['ADDRESS']);
+        setGlobal($object_name . '.UpdatedTimestamp', time());
+        setGlobal($object_name . '.UpdatedTime', $rec['LASTUPDATE']);
+
+        // Execute object method if defined
+        if (method_exists($this, 'callMethodSafe')) {
+            $this->callMethodSafe($object_name . '.onLocationUpdated');
+        } elseif (function_exists('callMethodSafe')) {
+            callMethodSafe($object_name . '.onLocationUpdated');
+        }
     }
-    $this->debug($return);
-	return $return;
- }
- 
- public function getLocationData($cookie_file) {
-    $url = 'https://www.google.com/maps/rpc/locationsharing/read?authuser=0&hl='.SETTINGS_SITE_LANGUAGE.'&gl='.SETTINGS_SITE_LANGUAGE.'&pb=';
-    $ch = curl_init($url);
-    $fp = fopen($cookie_file, 'r');
-    $data = fgets($fp);
-    fclose($fp);
-    if ($data[0]=='#'){
-        curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file);
-        curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie_file);
+
+    /**
+    * Forward location point to MajorDoMo GPS Tracker (app_gpstrack)
+    */
+    public function sendToGps($location) {
+        $params = array(
+            'latitude'  => $location['lat'],
+            'longitude' => $location['lon'],
+            'deviceid'  => $location['id'],
+            'provider'  => 'google_location',
+            'accuracy'  => $location['accuracy'],
+            'speed'     => isset($location['speed']) ? $location['speed'] : 0,
+        );
+
+        if (!empty($location['address'])) {
+            $params['address'] = $location['address'];
+        }
+
+        if (isset($location['battery']) && $location['battery'] > 0) {
+            $params['battlevel'] = $location['battery'];
+            $params['charging']  = $location['charging'];
+        }
+
+        $req = BASE_URL . "/gps.php?" . http_build_query($params);
+        $this->debug("Sending to gps.php: " . $req);
+
+        if (function_exists('getURLBackground')) {
+            getURLBackground($req, 0);
+        } else {
+            getURL($req, 0);
+        }
     }
-    else{
-        $headers = array();
-        $headers[] = 'Cookie: '.$data;
+
+    /**
+    * Calculate speed in km/h between two points
+    */
+    public function getSpeed($last, $new) {
+        $time_last = strtotime($last['LASTUPDATE']);
+        $time_new  = (int)($new['timestamp'] / 1000);
+        $dist      = $this->calculateTheDistance($last['LAT'], $last['LON'], $new['lat'], $new['lon']);
+        $diff      = $time_new - $time_last;
+
+        if ($diff <= 0) return 0;
+        return round(($dist / $diff) * 3.6, 2);
+    }
+
+    /**
+    * Calculate distance between two coordinates in meters
+    */
+    function calculateTheDistance($latA, $lonA, $latB, $lonB) {
+        $earth_radius = 6372795;
+
+        $lat1  = $latA * M_PI / 180;
+        $lat2  = $latB * M_PI / 180;
+        $long1 = $lonA * M_PI / 180;
+        $long2 = $lonB * M_PI / 180;
+
+        $cl1 = cos($lat1);
+        $cl2 = cos($lat2);
+        $sl1 = sin($lat1);
+        $sl2 = sin($lat2);
+
+        $delta  = $long2 - $long1;
+        $cdelta = cos($delta);
+        $sdelta = sin($delta);
+
+        $y = sqrt(pow($cl2 * $sdelta, 2) + pow($cl1 * $sl2 - $sl1 * $cl2 * $cdelta, 2));
+        $x = $sl1 * $sl2 + $cl1 * $cl2 * $cdelta;
+
+        $ad = atan2($y, $x);
+        return round($ad * $earth_radius);
+    }
+
+    /**
+    * Parse Google Location RPC response
+    */
+    public function getLocation($cookie_file) {
+        $path_parts = pathinfo($cookie_file);
+        try {
+            $result = $this->getLocationData($cookie_file);
+        } catch (Exception $e) {
+            $this->log("Error processing " . $path_parts['basename'] . ": " . $e->getMessage());
+            $this->config['ERROR_' . $path_parts['basename']] = $e->getMessage();
+            return array();
+        }
+
+        $this->config['ERROR_' . $path_parts['basename']] = '';
+        $return = array();
+
+        // Account owner coordinates (Index 9)
+        if (isset($result[9]) && is_array($result[9])) {
+            $owner = $result[9];
+            $return[] = array(
+                'id'        => 'owner_' . md5($cookie_file),
+                'name'      => $path_parts['filename'],
+                'fullname'  => $path_parts['filename'],
+                'image'     => '',
+                'address'   => isset($owner[1][4]) ? $owner[1][4] : '',
+                'timestamp' => isset($owner[1][2]) ? $owner[1][2] : (time() * 1000),
+                'lat'       => isset($owner[1][1][2]) ? $owner[1][1][2] : 0,
+                'lon'       => isset($owner[1][1][1]) ? $owner[1][1][1] : 0,
+                'accuracy'  => isset($owner[1][3]) ? $owner[1][3] : 0,
+                'battery'   => 0,
+                'charging'  => 0,
+            );
+        }
+
+        // Shared users (Index 0: Family Link members, friends, other shared devices)
+        if (isset($result[0]) && is_array($result[0])) {
+            foreach ($result[0] as $user) {
+                if (!isset($user[6][0])) continue;
+
+                $user_id   = $user[6][0];
+                $name      = isset($user[6][3]) ? $user[6][3] : (isset($user[6][2]) ? $user[6][2] : 'User');
+                $fullname  = isset($user[6][2]) ? $user[6][2] : $name;
+                $image     = isset($user[0][1]) ? $user[0][1] : '';
+                $address   = isset($user[1][4]) ? $user[1][4] : '';
+                $timestamp = isset($user[1][2]) ? $user[1][2] : (time() * 1000);
+                $lat       = isset($user[1][1][2]) ? $user[1][1][2] : 0;
+                $lon       = isset($user[1][1][1]) ? $user[1][1][1] : 0;
+                $accuracy  = isset($user[1][3]) ? $user[1][3] : 0;
+
+                // Battery and Charging status (Family Link / Location Sharing)
+                $battery  = 0;
+                $charging = 0;
+                if (isset($user[13]) && is_array($user[13])) {
+                    $charging = isset($user[13][0]) ? (int)$user[13][0] : 0;
+                    $battery  = isset($user[13][1]) ? (int)$user[13][1] : 0;
+                }
+
+                $return[] = array(
+                    'id'        => $user_id,
+                    'name'      => $name,
+                    'fullname'  => $fullname,
+                    'image'     => $image,
+                    'address'   => $address,
+                    'timestamp' => $timestamp,
+                    'lat'       => $lat,
+                    'lon'       => $lon,
+                    'accuracy'  => $accuracy,
+                    'battery'   => $battery,
+                    'charging'  => $charging,
+                );
+            }
+        }
+
+        $this->debug($return);
+        return $return;
+    }
+
+    /**
+    * Perform Google Maps RPC request with modern headers and session handling
+    */
+    public function getLocationData($cookie_file) {
+        $lang = defined('SETTINGS_SITE_LANGUAGE') && SETTINGS_SITE_LANGUAGE ? SETTINGS_SITE_LANGUAGE : 'uk';
+        $url = 'https://www.google.com/maps/rpc/locationsharing/read?authuser=0&hl=' . $lang . '&gl=' . $lang . '&pb=';
+
+        $ch = curl_init($url);
+
+        $fp = fopen($cookie_file, 'r');
+        $first_line = $fp ? fgets($fp) : '';
+        if ($fp) fclose($fp);
+
+        $headers = array(
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+            'Accept: */*',
+            'Accept-Language: uk-UA,uk;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Sec-Fetch-Site: same-origin',
+            'Sec-Fetch-Mode: cors',
+            'Sec-Fetch-Dest: empty',
+            'Referer: https://www.google.com/maps',
+            'Origin: https://www.google.com',
+        );
+
+        if (trim($first_line) != '' && $first_line[0] == '#') {
+            // Netscape cookies format
+            curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie_file);
+            curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file);
+        } else {
+            // Raw cookies string format
+            $raw_cookie = trim(file_get_contents($cookie_file));
+            $headers[] = 'Cookie: ' . $raw_cookie;
+            curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file);
+        }
+
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    }
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    curl_setopt($ch, CURLOPT_HEADER, 1);
-    curl_setopt($ch, CURLOPT_ENCODING, 'gzip');
-    curl_setopt($ch, CURLOPT_VERBOSE, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-    curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
-	 
-    $response = curl_exec($ch);
-    $info = curl_getinfo($ch);
-    curl_close($ch);
-    $headers = $this->get_headers_from_curl_response($response);
-    $this->debug('Location data : Connection successful, reponse : '. $info['http_code']);
-    if (empty($info['http_code']) || $info['http_code'] != 200) {
-        throw new Exception('Error connection : '. $info['http_code'] . ' => ' . json_encode($headers));
-    }
-    $result = substr($response, $info['header_size'] + 4);
-    if (!$this->is_json($result)) {
-        throw new Exception('Not valid json result : ' . $result);
-    }
-    $this->debug($result);
-    $result = json_decode($result, true);
-    if (!isset($result[9]) && !isset($result[0])) {
-	if(method_exists($this, 'sendnotification')) {
-		$this->sendnotification('Проблема с cookie файлом!', 'danger');
-	}
-        throw new Exception('Error json data : ' . json_encode($result));
-    }
-    return $result;
-}
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_HEADER, 1);
+        curl_setopt($ch, CURLOPT_ENCODING, 'gzip, deflate');
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
 
-private function is_json($string) {
- json_decode($string, true);
- if (json_last_error() != JSON_ERROR_NONE) {
-    $error = json_last_error_msg();
-    throw new \LogicException(sprintf("Failed to parse json string '%s', error: '%s'", $string, $error));
- }
- return true;
-}
+        $response = curl_exec($ch);
+        $info = curl_getinfo($ch);
+        curl_close($ch);
 
-public function get_headers_from_curl_response($response) {
-	$headers = array();
-	$header_text = substr($response, 0, strpos($response, "\r\n\r\n"));
-	foreach (explode("\r\n", $header_text) as $i => $line) {
-		if ($i === 0) {
-			$headers['http_code'] = $line;
-		} else {
-			list($key, $value) = explode(': ', $line);
-			$headers[$key] = $value;
-		}
-	}
-	return $headers;
-}
-/**
-* Install
-*
-* Module installation routine
-*
-* @access private
-*/
- function install($data='') {
-  subscribeToEvent($this->name, 'MINUTELY');
-  parent::install();
- }
-  /**
-     * Uninstall
-     *
-     * Module uninstall routine
-     *
-     * @access public
-     */
- function uninstall() {
+        if (empty($info['http_code']) || $info['http_code'] != 200) {
+            throw new Exception('Google Maps Connection Error: HTTP ' . $info['http_code'] . ' (Session may have expired)');
+        }
+
+        // Google returns XSSI protection prefix ")]}'\n"
+        $body = substr($response, $info['header_size']);
+        $clean_json = preg_replace('/^\)\]\}\'\s*/', '', $body);
+
+        $result = json_decode($clean_json, true);
+        if (!is_array($result) || (!isset($result[0]) && !isset($result[9]))) {
+            throw new Exception('Invalid Google Location JSON structure. Check cookies/session!');
+        }
+
+        return $result;
+    }
+
+    /**
+    * Optional Reverse Geocoding via official Google Maps Platform API
+    */
+    public function reverseGeocodeGoogle($lat, $lon) {
+        $key = trim($this->config['GOOGLE_API_KEY']);
+        if (empty($key)) return '';
+
+        $lang = defined('SETTINGS_SITE_LANGUAGE') && SETTINGS_SITE_LANGUAGE ? SETTINGS_SITE_LANGUAGE : 'uk';
+        $url = "https://maps.googleapis.com/maps/api/geocode/json?latlng={$lat},{$lon}&key={$key}&language={$lang}";
+
+        $res = getURL($url, 15);
+        if ($res) {
+            $data = json_decode($res, true);
+            if (isset($data['status']) && $data['status'] == 'OK' && !empty($data['results'][0]['formatted_address'])) {
+                return $data['results'][0]['formatted_address'];
+            }
+        }
+        return '';
+    }
+
+    /**
+    * Module installation routine
+    */
+    function install($data = '') {
+        subscribeToEvent($this->name, 'MINUTELY');
+        parent::install();
+    }
+
+    /**
+    * Module uninstall routine
+    */
+    function uninstall() {
         unsubscribeFromEvent($this->name, 'MINUTELY');
         SQLExec('DROP TABLE IF EXISTS google_locations');
         parent::uninstall();
     }
+
     /**
-     * dbInstall
-     *
-     * Database installation routine
-     *
-     * @access private
-     */
-function dbInstall($data) {
+    * Database installation routine
+    */
+    function dbInstall($data) {
         $data = <<<EOD
  google_locations: ID int(10) unsigned NOT NULL auto_increment
  google_locations: ID_USER varchar(255) NOT NULL DEFAULT ''
+ google_locations: LINKED_OBJECT varchar(255) NOT NULL DEFAULT ''
  google_locations: NAME varchar(255) NOT NULL DEFAULT ''
  google_locations: FULLNAME varchar(255) NOT NULL DEFAULT ''
- google_locations: IMAGE varchar(255)  NOT NULL DEFAULT ''
+ google_locations: IMAGE varchar(255) NOT NULL DEFAULT ''
  google_locations: LASTUPDATE datetime
- google_locations: ADDRESS varchar(512)  NOT NULL DEFAULT ''
+ google_locations: ADDRESS varchar(512) NOT NULL DEFAULT ''
  google_locations: LAT float DEFAULT '0' NOT NULL
  google_locations: LON float DEFAULT '0' NOT NULL
  google_locations: ACCURACY float DEFAULT '0' NOT NULL
  google_locations: SPEED float DEFAULT '0' NOT NULL
  google_locations: BATTLEVEL int(3) NOT NULL DEFAULT '0'
  google_locations: CHARGING int(3) NOT NULL DEFAULT '0'
- google_locations: SENDTOGPS int(3) NOT NULL DEFAULT '0'
+ google_locations: SENDTOGPS int(3) NOT NULL DEFAULT '1'
 
 EOD;
         parent::dbInstall($data);
     }
-// --------------------------------------------------------------------
 }
-/*
-*
-* TW9kdWxlIGNyZWF0ZWQgQXByIDEwLCAyMDE5IHVzaW5nIFNlcmdlIEouIHdpemFyZCAoQWN0aXZlVW5pdCBJbmMgd3d3LmFjdGl2ZXVuaXQuY29tKQ==
-*
-*/

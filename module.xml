@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<module>
+    <name>google_location</name>
+    <title>Google Location</title>
+    <title_ru>Google Локация</title_ru>
+    <category>applications</category>
+    <author>mambursoft</author>
+    <url>https://github.com/mambursoft/majordomo-google_location</url>
+    <version>1.0.0</version>
+    <description>Модуль відстеження геопозиції через Google Family Link та Google Maps Location Sharing з прямою передачею в GPS Tracker (app_gpstrack) та прив'язкою до об'єктів MajorDoMo.</description>
+    <description_ru>Модуль отслеживания геопозиции через Google Family Link и Google Maps Location Sharing с прямой передачей в GPS Tracker (app_gpstrack) и привязкой к объектам MajorDoMo.</description_ru>
+    <support>https://github.com/mambursoft/majordomo-google_location/issues</support>
+    <requires>
+        <module>app_gpstrack</module>
+    </requires>
+</module>
