@@ -9,11 +9,12 @@
 * - Direct binding to MajorDoMo Objects (e.g. Users.Son, Users.Admin)
 * - Google Maps Reverse Geocoding API integration (optional)
 * - Leaflet / OpenStreetMap visual tracking in Admin & User view
-* - Resilient CookieJar session handling for Google RPC endpoints
+* - Resilient session handling without corrupting master cookie files
+* - Netscape #HttpOnly_ unmasking and smart HTML auth error detection
 *
 * @package project
 * @author mambursoft <https://github.com/mambursoft>
-* @version 1.0.0
+* @version 1.0.1
 */
 
 class google_location extends module {
@@ -130,6 +131,16 @@ class google_location extends module {
         $out['GOOGLE_API_KEY']  = isset($this->config['GOOGLE_API_KEY']) ? $this->config['GOOGLE_API_KEY'] : '';
         $out['DEBUG']           = isset($this->config['DEBUG']) ? $this->config['DEBUG'] : 0;
 
+        // View last debug response dump
+        if ($this->view_mode == 'view_debug_log') {
+            $dump_file = $directory_cookies . 'last_response_dump.txt';
+            if (file_exists($dump_file)) {
+                $out['DEBUG_RESPONSE_DUMP'] = htmlspecialchars(file_get_contents($dump_file));
+            } else {
+                $out['DEBUG_RESPONSE_DUMP'] = 'Немає збереженої відповіді. Увімкніть Debug у налаштуваннях та натисніть "Оновити зараз".';
+            }
+        }
+
         // Edit user
         if ($this->view_mode == 'user_edit') {
             $this->edit_user($out, $this->id);
@@ -147,9 +158,19 @@ class google_location extends module {
         if ($this->view_mode == 'upload_cookie') {
             global $file, $file_name;
             if (!empty($file) && !empty($file_name)) {
-                $target = $directory_cookies . basename($file_name);
+                $clean_name = basename($file_name);
+                $target = $directory_cookies . $clean_name;
                 copy($file, $target);
                 chmod($target, 0666);
+
+                // Remove stale session cache for this file if present
+                $stale_session = $target . '.session';
+                if (file_exists($stale_session)) {
+                    unlink($stale_session);
+                }
+
+                // Immediately trigger sync
+                $this->updateLocation();
             }
             $this->redirect("?");
             return;
@@ -162,6 +183,9 @@ class google_location extends module {
             $file_to_del = $directory_cookies . $clean_name;
             if (file_exists($file_to_del)) {
                 unlink($file_to_del);
+            }
+            if (file_exists($file_to_del . '.session')) {
+                unlink($file_to_del . '.session');
             }
             $this->redirect("?");
             return;
@@ -200,11 +224,14 @@ class google_location extends module {
         }
         $out['LOCATIONS'] = $locations;
 
-        // List cookie files
+        // List cookie files (ignoring internal session cache files)
         $cookies_files = array();
         if ($handle = opendir($directory_cookies)) {
             while (false !== ($cfile = readdir($handle))) {
                 if ($cfile != "." && $cfile != ".." && !is_dir($directory_cookies . $cfile)) {
+                    if (substr($cfile, -8) === '.session' || substr($cfile, -4) === '.bak' || substr($cfile, 0, 5) === 'last_') {
+                        continue;
+                    }
                     $cpath = $directory_cookies . $cfile;
                     $error_key = 'ERROR_' . $cfile;
                     $err_text = isset($this->config[$error_key]) ? $this->config[$error_key] : '';
@@ -308,6 +335,10 @@ class google_location extends module {
             foreach ($files as $cookie_file) {
                 $full_path = $directory_cookies . $cookie_file;
                 if (!is_dir($full_path)) {
+                    // Ignore session caches and dumps
+                    if (substr($cookie_file, -8) === '.session' || substr($cookie_file, -4) === '.bak' || substr($cookie_file, 0, 5) === 'last_') {
+                        continue;
+                    }
                     $parsed = $this->getLocation($full_path);
                     if (is_array($parsed) && count($parsed) > 0) {
                         $locations = array_merge($locations, $parsed);
@@ -502,15 +533,23 @@ class google_location extends module {
     */
     public function getLocation($cookie_file) {
         $path_parts = pathinfo($cookie_file);
+        // Skip session cache files
+        if (substr($path_parts['basename'], -8) === '.session' || substr($path_parts['basename'], -4) === '.bak' || substr($path_parts['basename'], 0, 5) === 'last_') {
+            return array();
+        }
+
         try {
             $result = $this->getLocationData($cookie_file);
         } catch (Exception $e) {
-            $this->log("Error processing " . $path_parts['basename'] . ": " . $e->getMessage());
-            $this->config['ERROR_' . $path_parts['basename']] = $e->getMessage();
+            $error_msg = $e->getMessage();
+            $this->log("Помилка обробки " . $path_parts['basename'] . ": " . $error_msg);
+            $this->config['ERROR_' . $path_parts['basename']] = $error_msg;
+            $this->saveConfig();
             return array();
         }
 
         $this->config['ERROR_' . $path_parts['basename']] = '';
+        $this->saveConfig();
         $return = array();
 
         // Account owner coordinates (Index 9)
@@ -519,7 +558,7 @@ class google_location extends module {
             $return[] = array(
                 'id'        => 'owner_' . md5($cookie_file),
                 'name'      => $path_parts['filename'],
-                'fullname'  => $path_parts['filename'],
+                'fullname'  => $path_parts['filename'] . ' (Власник)',
                 'image'     => '',
                 'address'   => isset($owner[1][4]) ? $owner[1][4] : '',
                 'timestamp' => isset($owner[1][2]) ? $owner[1][2] : (time() * 1000),
@@ -581,11 +620,22 @@ class google_location extends module {
         $lang = defined('SETTINGS_SITE_LANGUAGE') && SETTINGS_SITE_LANGUAGE ? SETTINGS_SITE_LANGUAGE : 'uk';
         $url = 'https://www.google.com/maps/rpc/locationsharing/read?authuser=0&hl=' . $lang . '&gl=' . $lang . '&pb=';
 
-        $ch = curl_init($url);
+        $raw_content = file_get_contents($cookie_file);
+        if (empty(trim($raw_content))) {
+            throw new Exception("Файл cookie порожній. Будь ласка, завантажте валідний файл cookies.txt.");
+        }
 
-        $fp = fopen($cookie_file, 'r');
-        $first_line = $fp ? fgets($fp) : '';
-        if ($fp) fclose($fp);
+        // Normalize Netscape HttpOnly prefixes if present
+        $clean_cookie_content = preg_replace('/^#HttpOnly_/m', '', $raw_content);
+
+        // Separate working session file so the master user file is NEVER corrupted or overwritten
+        $session_cookie_file = $cookie_file . '.session';
+        if (!file_exists($session_cookie_file) || filesize($session_cookie_file) < 50) {
+            file_put_contents($session_cookie_file, $clean_cookie_content);
+            chmod($session_cookie_file, 0666);
+        }
+
+        $ch = curl_init($url);
 
         $headers = array(
             'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
@@ -594,19 +644,22 @@ class google_location extends module {
             'Sec-Fetch-Site: same-origin',
             'Sec-Fetch-Mode: cors',
             'Sec-Fetch-Dest: empty',
+            'X-Same-Domain: 1',
             'Referer: https://www.google.com/maps',
             'Origin: https://www.google.com',
         );
 
-        if (trim($first_line) != '' && $first_line[0] == '#') {
+        $first_char = trim($clean_cookie_content);
+        $first_char = !empty($first_char) ? $first_char[0] : '';
+
+        if ($first_char == '#' || strpos($clean_cookie_content, "\t") !== false) {
             // Netscape cookies format
-            curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie_file);
-            curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file);
+            curl_setopt($ch, CURLOPT_COOKIEFILE, $session_cookie_file);
+            curl_setopt($ch, CURLOPT_COOKIEJAR, $session_cookie_file);
         } else {
-            // Raw cookies string format
-            $raw_cookie = trim(file_get_contents($cookie_file));
-            $headers[] = 'Cookie: ' . $raw_cookie;
-            curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file);
+            // Raw header cookies string format
+            $headers[] = 'Cookie: ' . trim($raw_content);
+            curl_setopt($ch, CURLOPT_COOKIEJAR, $session_cookie_file);
         }
 
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
@@ -622,17 +675,63 @@ class google_location extends module {
         $info = curl_getinfo($ch);
         curl_close($ch);
 
-        if (empty($info['http_code']) || $info['http_code'] != 200) {
-            throw new Exception('Google Maps Connection Error: HTTP ' . $info['http_code'] . ' (Session may have expired)');
+        $cached_dir = ROOT . "cms/cached/google_location/";
+        if (!file_exists($cached_dir)) {
+            mkdir($cached_dir, 0777, true);
+        }
+
+        if (empty($info['http_code'])) {
+            throw new Exception("Не вдалося підключитися до Google Maps (порожня HTTP відповідь, перевірте зв'язок/DNS).");
+        }
+
+        $body = substr($response, $info['header_size']);
+        $trimmed_body = trim($body);
+
+        // Save debug response dump for diagnostics
+        if (!empty($this->config['DEBUG'])) {
+            file_put_contents($cached_dir . 'last_response_dump.txt', "HTTP Code: " . $info['http_code'] . "\n\n" . substr($response, 0, 4000));
+        }
+
+        // Detect HTML redirect / Auth expiration
+        if (stripos($trimmed_body, '<html') !== false || stripos($trimmed_body, '<!doctype') !== false || stripos($trimmed_body, 'accounts.google.com') !== false) {
+            // Reset cached session file to re-try from master on next run
+            if (file_exists($session_cookie_file)) {
+                unlink($session_cookie_file);
+            }
+
+            preg_match('/<title>(.*?)<\/title>/is', $trimmed_body, $matches);
+            $page_title = !empty($matches[1]) ? trim($matches[1]) : 'Сторінка авторизації';
+
+            throw new Exception("Сесія Google застаріла! Google повернув сторінку входу ('{$page_title}') замість координат. Токени (__Secure-1PSIDTS) закінчилися або акаунт вийшов із системи. Оновіть cookies.txt!");
+        }
+
+        if ($info['http_code'] != 200) {
+            throw new Exception('Google Maps HTTP Error ' . $info['http_code'] . '. Сесію відхилено сервером.');
         }
 
         // Google returns XSSI protection prefix ")]}'\n"
-        $body = substr($response, $info['header_size']);
-        $clean_json = preg_replace('/^\)\]\}\'\s*/', '', $body);
+        $clean_json = preg_replace('/^\)\]\}\'\s*/', '', $trimmed_body);
+
+        if (empty($clean_json)) {
+            throw new Exception("Отримано порожнє тіло відповіді від Google Maps.");
+        }
 
         $result = json_decode($clean_json, true);
-        if (!is_array($result) || (!isset($result[0]) && !isset($result[9]))) {
-            throw new Exception('Invalid Google Location JSON structure. Check cookies/session!');
+
+        if ($result === null && json_last_error() !== JSON_ERROR_NONE) {
+            $err_prefix = substr($clean_json, 0, 120);
+            throw new Exception("Помилка структури JSON (" . json_last_error_msg() . "): " . $err_prefix);
+        }
+
+        if (!is_array($result)) {
+            throw new Exception("Відповідь Google не є валідним масивом: " . substr($clean_json, 0, 100));
+        }
+
+        if (!isset($result[0]) && !isset($result[9])) {
+            $available_keys = implode(', ', array_keys($result));
+            // Save payload to examine structure
+            file_put_contents($cached_dir . 'last_unexpected_json.txt', $clean_json);
+            throw new Exception("Google не повернув список локацій (наявні ключі: [{$available_keys}]). Можливо, для цього акаунта ще ніхто не передав геопозицію або Google змінив структуру.");
         }
 
         return $result;

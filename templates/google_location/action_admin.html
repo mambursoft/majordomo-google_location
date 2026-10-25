@@ -3,6 +3,9 @@
     <div class="col-md-6">
         <a class="btn btn-default" href="#api_settings" data-toggle="collapse"><i class="glyphicon glyphicon-cog"></i> <#LANG_SETUP#></a>
         <a class="btn btn-primary" href="?view_mode=update_location"><i class="glyphicon glyphicon-refresh"></i> <#LANG_GL_MANUAL_UPDATE#></a>
+        [#if DEBUG="1"#]
+            <a class="btn btn-warning btn-sm" href="?view_mode=view_debug_log"><i class="glyphicon glyphicon-eye-open"></i> Дамп відповіді Google</a>
+        [#endif#]
     </div>
     <div class="col-md-6 text-right">
         <button class="btn btn-info btn-sm" data-toggle="modal" data-target="#about"><#LANG_GL_ABOUT#>&nbsp;&nbsp;<span class="glyphicon glyphicon-info-sign"></span></button>
@@ -43,12 +46,14 @@
                         <td>[#SIZE#]</td>
                         <td>
                             [#if ERROR!=''#]
-                                <span class="label label-danger" title="[#ERROR#]"><i class="glyphicon glyphicon-warning-sign"></i> [#ERROR#]</span>
+                                <div class="text-danger" style="font-size: 12px;">
+                                    <i class="glyphicon glyphicon-warning-sign"></i> <b>Помилка:</b> [#ERROR#]
+                                </div>
                             [#else#]
                                 <span class="label label-success"><#LANG_GL_STATUS_OK#></span>
                             [#endif ERROR#]
                         </td>
-                        <td>
+                        <td class="text-center" style="vertical-align: middle;">
                             <a class="btn btn-danger btn-xs" href="?view_mode=delete_cookie&name=[#NAME#]" title="<#LANG_DELETE#>" onClick="return confirm('<#LANG_ARE_YOU_SURE#>')"><i class="glyphicon glyphicon-trash"></i></a>
                         </td>
                     </tr>
@@ -88,9 +93,9 @@
                 </div>
                 <div class="form-group">
                     <label class="col-sm-4 control-label"><#LANG_GL_DEBUG#></label>
-                    <div class="col-sm-4">
+                    <div class="col-sm-6">
                         <label class="checkbox-inline">
-                            <input type="checkbox" name="debug" value="1"[#if DEBUG="1"#] checked[#endif#]> Увімкнути логи в DebMes
+                            <input type="checkbox" name="debug" value="1"[#if DEBUG="1"#] checked[#endif#]> Увімкнути збереження дампу та розширені логи в DebMes
                         </label>
                     </div>
                 </div>
@@ -245,27 +250,32 @@ function showMapModal(name, lat, lon, accuracy, address) {
 
 <!-- Help Modal -->
 <div class="modal fade" id="help" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
-                <h4 class="modal-title"><#LANG_GL_COOKIE_HELP#></h4>
+                <h4 class="modal-title"><#LANG_GL_COOKIE_HELP#> та стабільність сесії</h4>
             </div>
             <div class="modal-body">
-                <p><b>Як експортувати сесію Google:</b></p>
+                <h4>Як правильно отримати та підтримувати cookies.txt:</h4>
                 <ol>
-                    <li>Створіть або відкрийте виділений Google-акаунт розумного будинку у браузері (Chrome/Firefox).</li>
-                    <li>Переконайтеся, що на цей акаунт надходять геодані:
+                    <li><b>Окремий акаунт для розумного будинку:</b>
+                        <p class="text-danger"><b>КРИТИЧНО:</b> Не використовуйте ваш основний робочий акаунт Google! Використовуйте окремий Google-акаунт (наприклад, <code>smarthome.myfamily@gmail.com</code>), на який передають геодані син, донька та ви.</p>
+                    </li>
+                    <li><b>Чому куки можуть злітати (токен <code>__Secure-1PSIDTS</code>):</b>
+                        <p>Google захищає сесії динамічним токеном <code>__Secure-1PSIDTS</code>. Якщо після експорту кук ви залишите вкладку Google Maps відкритою у вашому браузері або будете користуватися цим акаунтом — браузер оновить цей токен на сервері Google, а збережений у файлі <code>cookies.txt</code> токен миттєво анулюється!</p>
+                    </li>
+                    <li><b>Правильний алгоритм експорту:</b>
                         <ul>
-                            <li>від сина (через додаток <b>Google Family Link</b> або Google Maps);</li>
-                            <li>від доньки (через <b>Google Maps -&gt; Передача геоданих</b>);</li>
-                            <li>від вашого основного акаунта.</li>
+                            <li>Відкрийте окреме вікно в режимі «Інкогніто» або окремий чистий профіль браузера.</li>
+                            <li>Увійдіть в Google-акаунт розумного будинку.</li>
+                            <li>Перейдіть на <a href="https://www.google.com/maps" target="_blank">Google Maps</a> і перевірте, що видно мітки рідних.</li>
+                            <li>Через розширення (наприклад, <i>Get cookies.txt LOCALLY</i>) експортуйте cookies для домену <code>.google.com</code>.</li>
+                            <li><b>Важливо:</b> У налаштуваннях розширення переконайтеся, що не стоїть галочка заборони HttpOnly куків.</li>
+                            <li>Завантажте отриманий <code>cookies.txt</code> сюди.</li>
+                            <li><b>Після експорту просто закрийте вікно браузера!</b> Не натискайте кнопку «Вийти» (Sign Out), інакше Google анулює сесію на сервері.</li>
                         </ul>
                     </li>
-                    <li>Відкрийте <a href="https://www.google.com/maps" target="_blank">Google Maps</a> і переконайтеся, що всі 3 пристрої видно на карті.</li>
-                    <li>Встановіть розширення (наприклад, <i>Get cookies.txt LOCALLY</i> для Chrome/Firefox).</li>
-                    <li>Експортуйте cookies для домену <code>.google.com</code> у файл <code>cookies.txt</code>.</li>
-                    <li>Завантажте отриманий файл у налаштуваннях модуля вище.</li>
                 </ol>
             </div>
             <div class="modal-footer">
@@ -281,7 +291,7 @@ function showMapModal(name, lat, lon, accuracy, address) {
         <div class="modal-content">
             <div class="modal-header">
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
-                <h4 class="modal-title">Google Location v1.0.0</h4>
+                <h4 class="modal-title">Google Location v1.0.1</h4>
             </div>
             <div class="modal-body text-center">
                 <img src="/img/modules/google_location.png" width="64" height="64" style="margin-bottom: 10px;" onerror="this.style.display='none'">
@@ -298,6 +308,20 @@ function showMapModal(name, lat, lon, accuracy, address) {
     </div>
 </div>
 
+[#endif VIEW_MODE#]
+
+[#if VIEW_MODE="view_debug_log"#]
+<div style="margin-bottom: 15px;">
+    <a class="btn btn-default" href="?">&laquo;&laquo; <#LANG_BACK#></a>
+</div>
+<div class="panel panel-default">
+    <div class="panel-heading">
+        <h3 class="panel-title">Остання сира відповідь від Google Maps (Debug Dump)</h3>
+    </div>
+    <div class="panel-body">
+        <pre style="max-height: 500px; overflow-y: auto; background: #222; color: #a6e22e; font-size: 11px;">[#DEBUG_RESPONSE_DUMP#]</pre>
+    </div>
+</div>
 [#endif VIEW_MODE#]
 
 [#if VIEW_MODE="user_edit"#]
