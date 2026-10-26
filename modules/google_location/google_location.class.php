@@ -14,7 +14,7 @@
 *
 * @package project
 * @author mambursoft <https://github.com/mambursoft>
-* @version 1.0.1
+* @version 1.0.2
 */
 
 class google_location extends module {
@@ -435,7 +435,8 @@ class google_location extends module {
         if (empty($rec['LINKED_OBJECT'])) return;
 
         $object_name = trim($rec['LINKED_OBJECT']);
-        if (!objectExists($object_name)) return;
+        $obj = getObject($object_name);
+        if (!is_object($obj)) return;
 
         setGlobal($object_name . '.Coordinates', $rec['LAT'] . ',' . $rec['LON']);
         setGlobal($object_name . '.Latitude', $rec['LAT']);
